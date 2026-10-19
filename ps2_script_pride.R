@@ -107,3 +107,13 @@ ggplot(unemp_summary, aes(x = fct_reorder(region, mean_rate), y = mean_rate)) +
     y = "Mean Unemployment Rate (%)"
   ) +
   theme_minimal()
+
+ggplot(unemp_recent, aes(x = date, y = unemployment_rate, color = region)) +
+  geom_line() +
+  labs(
+    title = "Monthly Unemployment Rate, 2015-Present",
+    x = "Date",
+    y = "Unemployment Rate (%)",
+    color = "Region"
+  ) +
+  theme_minimal()
