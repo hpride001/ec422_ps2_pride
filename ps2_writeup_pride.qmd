@@ -1,0 +1,179 @@
+---
+title: "Problem Set 2"
+author: "Holeman Pride"
+date: today
+format:
+  html:
+    toc: true
+    embed-resources: true
+---
+
+**GitHub repo:** <https://github.com/hpride001/ec422_ps2_pride>
+
+## Data
+
+The data are monthly, seasonally adjusted unemployment rates for the US, Oregon, California, Texas and New York from the FRED which is the St Louis Federal Reserves database. To download this i used `tq_get()` which is in `tidyquant` package and then saved this to `data/unemp_raw.rds`. This sample is from January 1976 to the most recent month that was available. The reason Oct 2025 is missing is because of a fall government shutdown.
+
+```{r}
+#| message: false
+library(tidyquant)
+library(tidyverse)
+library(knitr)
+
+unemp_raw = read_rds("data/unemp_raw.rds")
+head(unemp_raw)
+```
+
+## Wrangling
+
+I renamed `price` to `unemployment_rate` and added a `region` section that included readable names. Then I filled in the missing value for October 2025 with each regions September 2025 value. Then I calculated the month over month change in the unemployment rate for each region. I also made a version of this starting from January 2015. 
+
+```{r}
+unemp <- unemp_raw |>
+  rename(unemployment_rate = price) |>
+  mutate(
+    region = case_when(
+      symbol == "UNRATE" ~ "United States",
+      symbol == "ORUR" ~ "Oregon",
+      symbol == "CAUR" ~ "California",
+      symbol == "TXUR" ~ "Texas",
+      symbol == "NYUR" ~ "New York"
+    )
+  )
+
+unemp <- unemp |>
+  arrange(region, date) |>
+  group_by(region) |>
+  mutate(
+    unemployment_rate = replace(
+      unemployment_rate,
+      date == as.Date("2025-10-01"),
+      unemployment_rate[date == as.Date("2025-09-01")]
+    )
+  ) |>
+  ungroup()
+
+unemp <- unemp |>
+  arrange(region, date) |>
+  group_by(region) |>
+  mutate(unemployment_rate_change = unemployment_rate - lag(unemployment_rate)) |>
+  ungroup()
+
+unemp_recent <- unemp |>
+  filter(date >= as.Date("2015-01-01"))
+
+unemp_summary <- unemp |>
+  group_by(region) |>
+  summarize(
+    mean_rate = mean(unemployment_rate, na.rm = TRUE),
+    min_rate  = min(unemployment_rate, na.rm = TRUE),
+    max_rate  = max(unemployment_rate, na.rm = TRUE)
+  )
+
+unemp_recent_summary <- unemp_recent |>
+  group_by(region) |>
+  summarize(
+    mean_rate = mean(unemployment_rate, na.rm = TRUE),
+    min_rate  = min(unemployment_rate, na.rm = TRUE),
+    max_rate  = max(unemployment_rate, na.rm = TRUE)
+  )
+
+unemp_top_increases <- unemp |>
+  slice_max(unemployment_rate_change, n = 5)
+
+unemp_top_decreases <- unemp |>
+  slice_min(unemployment_rate_change, n = 5)
+
+unemp_no_covid <- unemp |>
+  filter(year(date) != 2020)
+
+unemp_top_increases_no_covid <- unemp_no_covid |>
+  slice_max(unemployment_rate_change, n = 5)
+
+unemp_top_decreases_no_covid <- unemp_no_covid |>
+  slice_min(unemployment_rate_change, n = 5)
+```
+
+The table below shows the mean, min and max unemployment rare in percentage (%) for each of the regions over the whole sample which is 1976 to the present day. 
+
+```{r}
+kable(unemp_summary, digits = 2)
+```
+
+The table below shows the same stats as above just starting from January 2015. 
+
+```{r}
+kable(unemp_recent_summary, digits = 2)
+```
+
+The table below shows the largest five month over month increases in unemployment rate in percentage across all of the regions without 2020. I dropped it because of the COVID spike that would of taken every spot.
+
+```{r}
+kable(unemp_top_increases_no_covid, digits = 2)
+```
+
+The table below shows the five largest month over month decreases also without 2020. 
+
+```{r}
+kable(unemp_top_decreases_no_covid, digits = 2)
+```
+
+## Visualization
+
+The plot shows the unemployment rare for all the regions over the whole sample. The regions move closer together over the business cycle and it rises in each recession. The largest spike is in April 2020. 
+
+```{r}
+ggplot(unemp, aes(x = date, y = unemployment_rate, color = region)) +
+  geom_line() +
+  labs(
+    title = "Monthly Unemployment Rate, 1976-Present",
+    x = "Date",
+    y = "Unemployment Rate (%)",
+    color = "Region"
+  ) +
+  theme_minimal()
+```
+
+This shows the same data with another panel for each region which is easier to see. 
+
+```{r}
+ggplot(unemp, aes(x = date, y = unemployment_rate, color = region)) +
+  geom_line(show.legend = FALSE) +
+  facet_wrap(~ region) +
+  labs(
+    title = "Monthly Unemployment Rate by Region, 1976-Present",
+    x = "Date",
+    y = "Unemployment Rate (%)"
+  ) +
+  theme_minimal()
+```
+
+This chart is the average unemployment rate for each region over the whole sample going from lowest to highest. 
+
+```{r}
+ggplot(unemp_summary, aes(x = fct_reorder(region, mean_rate), y = mean_rate)) +
+  geom_col() +
+  labs(
+    title = "Average Unemployment Rate by Region, 1976-Present",
+    x = "Region",
+    y = "Mean Unemployment Rate (%)"
+  ) +
+  theme_minimal()
+```
+
+For my own plot I graphed the unemployment rate for each of the regions 2015 and onward. In the full sample plot the spike due to COVID and recovery and in a thin sliver so zooming in is easier to see how high each regions unemployment was in 2020 and how fast it was able to recover. 
+```{r}
+ggplot(unemp_recent, aes(x = date, y = unemployment_rate, color = region)) +
+  geom_line() +
+  labs(
+    title = "Monthly Unemployment Rate, 2015-Present",
+    x = "Date",
+    y = "Unemployment Rate (%)",
+    color = "Region"
+  ) +
+  theme_minimal()
+```
+
+## Reflection
+
+The dplyr wrangling and ggplot were pretty straightforward once I saw how the pipe connects each step together. What was the most difficult for me was the setting up. AT first I ran a single line of my script before I loaded the packages and I was getting a "could not find function" error. I also had some problems getting the git push to work but once I figured that out it was okay. I learned the difference between the Console which runs the R code and the Terminal which runs the Git commands. I feel much more comfortable with these now and I think the committing in small batches is useful. 
