@@ -78,3 +78,32 @@ unemp_top_increases_no_covid <- unemp_no_covid |>
 
 unemp_top_decreases_no_covid <- unemp_no_covid |>
   slice_min(unemployment_rate_change, n = 5)
+
+ggplot(unemp, aes(x = date, y = unemployment_rate, color = region)) +
+  geom_line() +
+  labs(
+    title = "Monthly Unemployment Rate, 1976-Present",
+    x = "Date",
+    y = "Unemployment Rate (%)",
+    color = "Region"
+  ) +
+  theme_minimal()
+
+ggplot(unemp, aes(x = date, y = unemployment_rate, color = region)) +
+  geom_line(show.legend = FALSE) +
+  facet_wrap(~ region) +
+  labs(
+    title = "Monthly Unemployment Rate by Region, 1976-Present",
+    x = "Date",
+    y = "Unemployment Rate (%)"
+  ) +
+  theme_minimal()
+
+ggplot(unemp_summary, aes(x = fct_reorder(region, mean_rate), y = mean_rate)) +
+  geom_col() +
+  labs(
+    title = "Average Unemployment Rate by Region, 1976-Present",
+    x = "Region",
+    y = "Mean Unemployment Rate (%)"
+  ) +
+  theme_minimal()
